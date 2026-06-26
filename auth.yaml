@@ -1,0 +1,4 @@
+harbor.aiwa.top:
+    username: robot$clouddao_bot 
+    password: ${HARBOR_PASSWORD}
+    insecure: true
