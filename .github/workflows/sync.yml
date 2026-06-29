@@ -11,11 +11,37 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: hhyasdf/image-sync-action@v1.1
-        with:
-          auth_file: ./auth.yaml
-          images_file: ./images.yaml
-          proc: 10
-          retries: 3
-        env:
-          HARBOR_PASSWORD: ${{ secrets.HARBOR_PASSWORD }}
+      - name: Login to Harbor
+        run: |
+          echo "${{ secrets.HARBOR_PASSWORD }}" | skopeo login harbor.aiwa.top \
+            --username 'robot$clouddao_bot' \
+            --password-stdin \
+            --tls-verify=false
+
+      - name: Sync images
+        run: |
+          python3 - <<'EOF'
+          import yaml, subprocess, sys
+
+          with open("images.yaml") as f:
+              images = yaml.safe_load(f)
+
+          failed = []
+          for src, dst in images.items():
+              print(f"Syncing: {src} -> {dst}")
+              result = subprocess.run([
+                  "skopeo", "copy",
+                  "--override-os", "linux",
+                  "--override-arch", "amd64",
+                  "--dest-tls-verify=false",
+                  f"docker://{src}",
+                  f"docker://{dst}",
+              ])
+              if result.returncode != 0:
+                  print(f"FAILED: {src}")
+                  failed.append(src)
+
+          if failed:
+              print(f"\nFailed images: {failed}")
+              sys.exit(1)
+          EOF
